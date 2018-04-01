@@ -38,4 +38,47 @@ int main(int argr, char *args[])
 	  {
 		fprintf(stderr, "Unable to create reader thread\n");
 		exit(1);
+	  }
+	}
+	for (idx = 0; idx < SIZE_BUFF; ++idx)
+	{
+		pthread_join(thId[idx], NULL);	
+	}
+	fprintf(stdout, "Parent thread quitting\n");
+	return 0;
+}
+
+void *writer(void* param)
+{	
+	int r = rand() % 500;
+	//fprintf(stdout, "Sleep for %d\n", r);
+	usleep(r);
+	//fprintf(stdout, "Thread writer\n");
+	pthread_mutex_lock(&mtx);
+		while(res_acc > 0 || rd_priority_flag == 1)
+			pthread_cond_wait(&prod_cond,&mtx);
+		--res_acc;
+	pthread_mutex_unlock(&mtx);
+	
+	// write data here	
+	unsigned int tid = (unsigned int)pthread_self();
+
+	pthread_mutex_lock(&mtxData);
+
+	if (fr != rr)  // check if bff is not full
+	{
+		int newVal = rand() % 300;
+		bff[rr] = newVal; 
+		rr = (rr + 1) %  SIZE_BUFF; // set new position	
+		int readersCount = res_acc < 0 ? 0 : res_acc;
+		fprintf(stdout, "Data written by thread %u is %d with readers %d\n", tid, newVal, readersCount);
+	}
+
+	pthread_mutex_unlock(&mtxData);
+	
+	pthread_mutex_lock(&mtx);
+		++res_acc;
+		pthread_cond_broadcast(&cons_cond);
+		pthread_cond_broadcast(&prod_cond);
+	pthread_mutex_unlock(&mtx);
 
